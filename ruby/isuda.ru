@@ -12,7 +12,7 @@ if ENV['STACKPROF'] == '1'
       mode: :wall,
       interval: 10,
       save_every: 1,
-      path: '/tmp/stackprof'
+      path: '/tmp/stackprof/isuda'
 end
 
 if ENV['SQLLOG'] == '1'
