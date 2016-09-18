@@ -98,11 +98,11 @@ module Isuda
       end
 
       def aho_corasick
-        Thread.current[:db] ||= AhoCorasickMatcher.new(get_keywords())
+        Thread.current[:aho] ||= AhoCorasickMatcher.new(get_keywords())
       end
 
       def update_aho_corasick
-        Thread.current[:db] = AhoCorasickMatcher.new(get_keywords())
+        Thread.current[:aho] = AhoCorasickMatcher.new(get_keywords())
       end
 
       def register(name, pw) # nameとpwを

@@ -34,9 +34,12 @@ class AhoCorasickMatcher
       child = (node || root).search(char.intern)
       next unless child
       if found = child.matches.max{|a, b| a.length <=> b.length }
-        p child.matches
         start = cur - found.length + 1
         next if start == prestart or start < preend
+
+        match = ret.last && ret.last.match(/>([^<]+)<\/a>/)
+        ret.pop if match && found.include?(match[1])
+
         ret << Rack::Utils.escape_html(string[pos..start-1])
         ret << create_link(found)
         pos = cur + 1
