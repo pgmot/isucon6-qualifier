@@ -11,6 +11,7 @@ require 'sinatra/base'
 require 'tilt/erubis'
 
 require 'redis'
+require_relative './../aho2.rb'
 
 module Isuda
   class Web < ::Sinatra::Base
@@ -85,11 +86,11 @@ module Isuda
       end
 
       def add_keyword(keyword)
-        redis.zadd 'keywords', keyword.length, Regexp.escape(keyword)
+        redis.zadd 'keywords', keyword.length, keyword
       end
 
       def del_keyword(keyword)
-        redis.zrem 'keywords', Regexp.escape(keyword)
+        redis.zrem 'keywords', keyword
       end
 
       def get_keywords
@@ -120,20 +121,23 @@ module Isuda
       end
 
       def htmlify(content)
-        pattern = get_keywords.join('|')
-        kw2hash = {} # kw2hash
-        hashed_content = content.gsub(/(#{pattern})/) {|m| # キーワードをハッシュに置換する
-          matched_keyword = $1
-          "isuda_#{Digest::SHA1.hexdigest(matched_keyword)}".tap do |hash|
-            kw2hash[matched_keyword] = hash
-          end
-        }
-        escaped_content = Rack::Utils.escape_html(hashed_content) #
-        kw2hash.each do |(keyword, hash)| # ハッシュをアンカーに置換する
-          keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
-          anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおくのアリ
-          escaped_content.gsub!(hash, anchor)
-        end
+        # pattern = get_keywords.join('|')
+        # kw2hash = {} # kw2hash
+        # hashed_content = content.gsub(/(#{pattern})/) {|m| # キーワードをハッシュに置換する
+        #   matched_keyword = $1
+        #   "isuda_#{Digest::SHA1.hexdigest(matched_keyword)}".tap do |hash|
+        #     kw2hash[matched_keyword] = hash
+        #   end
+        # }
+        # escaped_content = Rack::Utils.escape_html(hashed_content) #
+        # kw2hash.each do |(keyword, hash)| # ハッシュをアンカーに置換する
+        #   keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
+        #   anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおくのアリ
+        #   escaped_content.gsub!(hash, anchor)
+        # end
+        # escaped_content.gsub(/\n/, "<br />\n")
+        @aho_corasick ||= AhoCorasickMatcher.new(get_keywords())
+        escaped_content = @aho_corasick.create_autolink(content)
         escaped_content.gsub(/\n/, "<br />\n")
       end
 
@@ -296,6 +300,9 @@ module Isuda
       # isuda_keyword_url.path = '/keyword/%s' % [Rack::Utils.escape_path(keyword)]
       # res = Net::HTTP.get_response(isuda_keyword_url)
       # halt(404) unless Net::HTTPSuccess === res
+      unless db.xquery(%| SELECT * FROM entry WHERE keyword = ? |, keyword).first
+        halt(404)
+      end
 
       user_name = params[:user]
       db.xquery(%|
