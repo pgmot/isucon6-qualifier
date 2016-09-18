@@ -99,7 +99,7 @@ module Isuda
             kw2hash[matched_keyword] = hash
           end
         }
-        escaped_content = Rack::Utils.escape_html(hashed_content) #
+        escaped_content = Rack::Utils.escape_html(hashed_content) # 
         kw2hash.each do |(keyword, hash)| # ハッシュをアンカーに置換する
           keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
           anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおくのアリ
@@ -172,7 +172,7 @@ module Isuda
     end
 
     get '/register', set_name: true do
-      send_file 'register.erb'
+      erb :register
     end
 
     post '/register' do
@@ -190,7 +190,7 @@ module Isuda
       locals = {
         action: 'login',
       }
-      send_file 'authenticate.erb'
+      erb :authenticate, locals: locals
     end
 
     post '/login' do # TODO タイムアウト
