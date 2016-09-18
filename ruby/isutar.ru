@@ -2,6 +2,8 @@
 
 require_relative './lib/isutar/web.rb'
 
+require 'dotenv'
+
 Dotenv.load
 if ENV['STACKPROF'] == '1'
   require 'stackprof'
