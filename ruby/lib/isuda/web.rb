@@ -79,6 +79,8 @@ module Isuda
 
       def init_keywords
         redis(false).zremrangebyrank('keywords', 0, -1)
+        incr.set('update', 0) unless incr.get('update')
+        Thread.current[:aho_update] ||= incr.get('update')
         keywords = db.xquery(%| select keyword from entry |)
         keywords.each do |k|
           add_keyword(k[:keyword])
@@ -87,10 +89,12 @@ module Isuda
 
       def add_keyword(keyword)
         redis.zadd 'keywords', keyword.length, keyword
+        redis.incr('update')
       end
 
       def del_keyword(keyword)
         redis.zrem 'keywords', keyword
+        redis.incr('update')
       end
 
       def get_keywords
@@ -98,11 +102,12 @@ module Isuda
       end
 
       def aho_corasick
+        update = redis.get('update')
+        if update > Thread.current[:aho_update]
+          Thread.current[:aho] = nil
+          Thread.current[:aho_update] = update
+        end
         Thread.current[:aho] ||= AhoCorasickMatcher.new(get_keywords())
-      end
-
-      def update_aho_corasick
-        Thread.current[:aho] = AhoCorasickMatcher.new(get_keywords())
       end
 
       def register(name, pw) # nameとpwを
@@ -269,7 +274,6 @@ module Isuda
       |, *bound) # キーワード同一になってたら、description更新？
 
       add_keyword(keyword)
-      update_aho_corasick
 
       redirect_found '/'
     end
@@ -297,7 +301,6 @@ module Isuda
 
       db.xquery(%| DELETE FROM entry WHERE keyword = ? |, keyword) # うまいこと246と結合できないか
       del_keyword(keyword)
-      update_aho_corasick
 
       redirect_found '/'
     end
