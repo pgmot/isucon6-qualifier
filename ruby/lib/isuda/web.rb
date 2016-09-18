@@ -99,7 +99,7 @@ module Isuda
             kw2hash[matched_keyword] = hash
           end
         }
-        escaped_content = Rack::Utils.escape_html(hashed_content) # 
+        escaped_content = Rack::Utils.escape_html(hashed_content) #
         kw2hash.each do |(keyword, hash)| # ハッシュをアンカーに置換する
           keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
           anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおくのアリ
@@ -195,7 +195,7 @@ module Isuda
 
     post '/login' do # TODO タイムアウト
       name = params[:name]
-      user = db.xquery(%| select * from user where name = ? |, name).first
+      user = db.xquery(%| select id,password,salt from user where name = ? |, name).first
       halt(403) unless user
       halt(403) unless user[:password] == encode_with_salt(password: params[:password], salt: user[:salt])
 
