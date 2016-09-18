@@ -113,12 +113,14 @@ module Isuda
       end
 
       def load_stars(keyword) # TODO タイムアウト キーワードに一致するスターを取ってくる、isutarの実装を持ってくるか、DB叩くのが早そう
-        isutar_url = URI(settings.isutar_origin)
-        isutar_url.path = '/stars'
-        isutar_url.query = URI.encode_www_form(keyword: keyword)
-        body = Net::HTTP.get(isutar_url)
-        stars_res = JSON.parse(body)
-        stars_res['stars']
+        # isutar_url = URI(settings.isutar_origin)
+        # isutar_url.path = '/stars'
+        # isutar_url.query = URI.encode_www_form(keyword: keyword)
+        # body = Net::HTTP.get(isutar_url)
+        keyword = keyword || ''
+        db.xquery(%| select * from star where keyword = ? |, keyword).to_a
+        # stars_res = JSON.parse(body)
+        # stars_res['stars']
       end
 
       def redirect_found(path)
@@ -128,9 +130,10 @@ module Isuda
 
     get '/initialize' do
       db.xquery(%| DELETE FROM entry WHERE id > 7101 |)
-      isutar_initialize_url = URI(settings.isutar_origin)
-      isutar_initialize_url.path = '/initialize'
-      Net::HTTP.get_response(isutar_initialize_url)
+      db.xquery('TRUNCATE star')
+      # isutar_initialize_url = URI(settings.isutar_origin)
+      # isutar_initialize_url.path = '/initialize'
+      # Net::HTTP.get_response(isutar_initialize_url)
 
       content_type :json
       JSON.generate(result: 'ok')
@@ -250,6 +253,24 @@ module Isuda
       db.xquery(%| DELETE FROM entry WHERE keyword = ? |, keyword) # うまいこと246と結合できないか
 
       redirect_found '/'
+    end
+
+    post '/stars' do
+      keyword = params[:keyword]
+
+      # isuda_keyword_url = URI(settings.isuda_origin)
+      # isuda_keyword_url.path = '/keyword/%s' % [Rack::Utils.escape_path(keyword)]
+      # res = Net::HTTP.get_response(isuda_keyword_url)
+      # halt(404) unless Net::HTTPSuccess === res
+
+      user_name = params[:user]
+      db.xquery(%|
+        INSERT INTO star (keyword, user_name, created_at)
+        VALUES (?, ?, NOW())
+      |, keyword, user_name)
+
+      content_type :json
+      JSON.generate(result: 'ok')
     end
   end
 end
