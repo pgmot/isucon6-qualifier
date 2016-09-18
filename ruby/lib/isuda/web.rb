@@ -30,7 +30,7 @@ module Isuda
       register Sinatra::Reloader
     end
 
-    set(:set_name) do |value|
+    set(:set_name) do |value| # User idと名前を取ってくるだけ。@user_id, @user_name
       condition {
         user_id = session[:user_id]
         if user_id
@@ -42,14 +42,14 @@ module Isuda
       }
     end
 
-    set(:authenticate) do |value|
+    set(:authenticate) do |value| # @user_idに何も入ってなかったら,403
       condition {
         halt(403) unless @user_id
       }
     end
 
     helpers do
-      def db
+      def db # こいつは、db.xqueryのdbの部分。DBが何もなかったら、作る処理してる。
         Thread.current[:db] ||=
           begin
             _, _, attrs_part = settings.dsn.split(':', 3)
@@ -66,7 +66,7 @@ module Isuda
           end
       end
 
-      def register(name, pw)
+      def register(name, pw) # nameとpwを
         chars = [*'A'..'~']
         salt = 1.upto(20).map { chars.sample }.join('')
         salted_password = encode_with_salt(password: pw, salt: salt)
@@ -77,11 +77,11 @@ module Isuda
         db.last_id
       end
 
-      def encode_with_salt(password: , salt: )
+      def encode_with_salt(password: , salt: ) # ソルト作る
         Digest::SHA1.hexdigest(salt + password)
       end
 
-      def is_spam_content(content)
+      def is_spam_content(content) # 謎のisupamは、スパムチェッカ。
         isupam_uri = URI(settings.isupam_origin)
         res = Net::HTTP.post_form(isupam_uri, 'content' => content)
         validation = JSON.parse(res.body)
@@ -91,18 +91,18 @@ module Isuda
 
       def htmlify(content)
         keywords = db.xquery(%| select * from entry order by character_length(keyword) desc |)
-        pattern = keywords.map {|k| Regexp.escape(k[:keyword]) }.join('|')
-        kw2hash = {}
-        hashed_content = content.gsub(/(#{pattern})/) {|m|
+        pattern = keywords.map {|k| Regexp.escape(k[:keyword]) }.join('|') # あー重そう。Regexpをエスケープした上で正規表現にする。
+        kw2hash = {} # kw2hash
+        hashed_content = content.gsub(/(#{pattern})/) {|m| # キーワードをハッシュに置換する
           matched_keyword = $1
           "isuda_#{Digest::SHA1.hexdigest(matched_keyword)}".tap do |hash|
             kw2hash[matched_keyword] = hash
           end
         }
-        escaped_content = Rack::Utils.escape_html(hashed_content)
-        kw2hash.each do |(keyword, hash)|
+        escaped_content = Rack::Utils.escape_html(hashed_content) # 
+        kw2hash.each do |(keyword, hash)| # ハッシュをアンカーに置換する
           keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
-          anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)]
+          anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおくのアリ
           escaped_content.gsub!(hash, anchor)
         end
         escaped_content.gsub(/\n/, "<br />\n")
@@ -112,7 +112,7 @@ module Isuda
         Rack::Utils.escape_path(str)
       end
 
-      def load_stars(keyword)
+      def load_stars(keyword) # TODO タイムアウト キーワードに一致するスターを取ってくる、isutarの実装を持ってくるか、DB叩くのが早そう
         isutar_url = URI(settings.isutar_origin)
         isutar_url.path = '/stars'
         isutar_url.query = URI.encode_www_form(keyword: keyword)
@@ -146,23 +146,23 @@ module Isuda
         LIMIT #{per_page}
         OFFSET #{per_page * (page - 1)}
       |)
-      entries.each do |entry|
+      entries.each do |entry| # ここ重そう
         entry[:html] = htmlify(entry[:description])
         entry[:stars] = load_stars(entry[:keyword])
       end
 
-      total_entries = db.xquery(%| SELECT count(*) AS total_entries FROM entry |).first[:total_entries].to_i
+      total_entries = db.xquery(%| SELECT count(*) AS total_entries FROM entry |).first[:total_entries].to_i # エントリの全数を取得
 
-      last_page = (total_entries.to_f / per_page.to_f).ceil
+      last_page = (total_entries.to_f / per_page.to_f).ceil # ここからペジネーション処理
       from = [1, page - 5].max
       to = [last_page, page + 5].min
       pages = [*from..to]
 
       locals = {
-        entries: entries,
-        page: page,
-        pages: pages,
-        last_page: last_page,
+        entries: entries, # エントリ一覧
+        page: page, # ページ番号
+        pages: pages, # ページ番号の配列
+        last_page: last_page, # 最後のページ番号
       }
       erb :index, locals: locals
     end
@@ -186,14 +186,14 @@ module Isuda
       redirect_found '/'
     end
 
-    get '/login', set_name: true do
+    get '/login', set_name: true do # もしかしたら無駄？
       locals = {
         action: 'login',
       }
       erb :authenticate, locals: locals
     end
 
-    post '/login' do
+    post '/login' do # TODO タイムアウト
       name = params[:name]
       user = db.xquery(%| select * from user where name = ? |, name).first
       halt(403) unless user
@@ -209,11 +209,11 @@ module Isuda
       redirect_found '/'
     end
 
-    post '/keyword', set_name: true, authenticate: true do
+    post '/keyword', set_name: true, authenticate: true do # ここ重要そう（TODO タイムアウト
       keyword = params[:keyword] || ''
-      halt(400) if keyword == ''
+      halt(400) if keyword == '' # はてなキーワード
       description = params[:description]
-      halt(400) if is_spam_content(description) || is_spam_content(keyword)
+      halt(400) if is_spam_content(description) || is_spam_content(keyword) # ここ重そう
 
       bound = [@user_id, keyword, description] * 2
       db.xquery(%|
@@ -221,7 +221,7 @@ module Isuda
         VALUES (?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
         author_id = ?, keyword = ?, description = ?, updated_at = NOW()
-      |, *bound)
+      |, *bound) # キーワード同一になってたら、description更新？
 
       redirect_found '/'
     end
@@ -230,8 +230,8 @@ module Isuda
       keyword = params[:keyword] or halt(400)
 
       entry = db.xquery(%| select * from entry where keyword = ? |, keyword).first or halt(404)
-      entry[:stars] = load_stars(entry[:keyword])
-      entry[:html] = htmlify(entry[:description])
+      entry[:stars] = load_stars(entry[:keyword]) # 重そう
+      entry[:html] = htmlify(entry[:description]) # 参照のたびにするの無駄、更新時にやって
 
       locals = {
         entry: entry,
@@ -247,7 +247,7 @@ module Isuda
         halt(404)
       end
 
-      db.xquery(%| DELETE FROM entry WHERE keyword = ? |, keyword)
+      db.xquery(%| DELETE FROM entry WHERE keyword = ? |, keyword) # うまいこと246と結合できないか
 
       redirect_found '/'
     end
