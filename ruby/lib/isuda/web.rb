@@ -68,16 +68,20 @@ module Isuda
           end
       end
 
-      def redis
+      def redis(use_init = true)
         unless Thread.current[:redis]
           Thread.current[:redis] = Redis.new(:host => "127.0.0.1", :db => 0)
-          Thread.current[:redis].zremrangebyrank('keywords', 0, -1)
-          keywords = db.xquery(%| select keyword from entry |)
-          keywords.each do |k|
-            add_keyword(k[:keyword])
-          end
+          init_keywords if use_init
         end
         Thread.current[:redis]
+      end
+
+      def init_keywords
+        redis(false).zremrangebyrank('keywords', 0, -1)
+        keywords = db.xquery(%| select keyword from entry |)
+        keywords.each do |k|
+          add_keyword(k[:keyword])
+        end
       end
 
       def add_keyword(keyword)
@@ -160,7 +164,7 @@ module Isuda
       # isutar_initialize_url.path = '/initialize'
       # Net::HTTP.get_response(isutar_initialize_url)
 
-      redis
+      init_keywords
 
       content_type :json
       JSON.generate(result: 'ok')
