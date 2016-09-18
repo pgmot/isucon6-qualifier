@@ -35,12 +35,7 @@ class AhoCorasick
   end
 
   def add_link_tag(keyword)
-    # keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
-    # anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおくのアリ
-    # keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
-
-    # 雑
-    anchor = '<a href="%s">%s</a>' % ["/keyword/#{keyword}", keyword]
+    anchor = '<a href="%s">%s</a>' % ["/keyword/#{Rack::Utils.escape_path(keyword)}"), Rack::Utirls.escape_html(keyword)]
   end
 
   def create_link_str(string)
@@ -56,7 +51,7 @@ class AhoCorasick
         if match.start == prestart or match.start < preend
           next (node && node.find(char.to_sym)) || @root.find(char.to_sym)
         end
-        ret << string[pos...match.start]
+        ret << Rack::Utils.escape_html(string[pos...match.start])
         pos = index + 1
         ret << add_link_tag(match_first)
         prestart = match.start

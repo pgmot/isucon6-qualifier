@@ -10,6 +10,8 @@ require 'rack/utils'
 require 'sinatra/base'
 require 'tilt/erubis'
 
+require '../aho-corasick.rb'
+
 module Isuda
   class Web < ::Sinatra::Base
     enable :protection
@@ -91,20 +93,8 @@ module Isuda
 
       def htmlify(content)
         keywords = db.xquery(%| select * from entry order by character_length(keyword) desc |)
-        pattern = keywords.map {|k| Regexp.escape(k[:keyword]) }.join('|') # あー重そう。Regexpをエスケープする。
-        kw2hash = {} # kw2hash
-        hashed_content = content.gsub(/(#{pattern})/) {|m| # 正規表現作ってる、キーワードをハッシュに置換する
-          matched_keyword = $1
-          "isuda_#{Digest::SHA1.hexdigest(matched_keyword)}".tap do |hash|
-            kw2hash[matched_keyword] = hash
-          end
-        }
-        escaped_content = Rack::Utils.escape_html(hashed_content) # 
-        kw2hash.each do |(keyword, hash)| # ハッシュをアンカーに置換する
-          keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
-          anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおきたいけど無理、7000件を毎回やるの無理
-          escaped_content.gsub!(hash, anchor)
-        end
+        @aho_corasick ||= AhoCorasick.new(*keywords)
+        escaped_content = @aho_corasick.create_link_str(content)
         escaped_content.gsub(/\n/, "<br />\n")
       end
 
