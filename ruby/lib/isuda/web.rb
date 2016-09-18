@@ -10,6 +10,8 @@ require 'rack/utils'
 require 'sinatra/base'
 require 'tilt/erubis'
 
+require 'redis'
+
 module Isuda
   class Web < ::Sinatra::Base
     enable :protection
@@ -66,6 +68,30 @@ module Isuda
           end
       end
 
+      def redis
+        Thread.current[:redis] ||= Redis.new(:host => "127.0.0.1", :db => 0)
+      end
+
+      def init_keywords
+        redis.zremrangebyrank('keywords', 0, -1)
+        keywords = db.xquery(%| select keyword from entry |)
+        keywords.each do |k|
+          add_keyword(k[:keyword])
+        end
+      end
+
+      def add_keyword(keyword)
+        redis.zadd 'keywords', keyword.length, Regexp.escape(keyword)
+      end
+
+      def del_keyword(keyword)
+        redis.zrem 'keywords', Regexp.escape(keyword)
+      end
+
+      def get_keywords
+        redis.zrevrange('keywords', 0, -1)
+      end
+
       def register(name, pw) # nameとpwを
         chars = [*'A'..'~']
         salt = 1.upto(20).map { chars.sample }.join('')
@@ -90,8 +116,7 @@ module Isuda
       end
 
       def htmlify(content)
-        keywords = db.xquery(%| select * from entry order by character_length(keyword) desc |)
-        pattern = keywords.map {|k| Regexp.escape(k[:keyword]) }.join('|') # あー重そう。Regexpをエスケープした上で正規表現にする。
+        pattern = get_keywords.join('|')
         kw2hash = {} # kw2hash
         hashed_content = content.gsub(/(#{pattern})/) {|m| # キーワードをハッシュに置換する
           matched_keyword = $1
@@ -226,6 +251,8 @@ module Isuda
         author_id = ?, keyword = ?, description = ?, updated_at = NOW()
       |, *bound) # キーワード同一になってたら、description更新？
 
+      add_keyword(keyword)
+
       redirect_found '/'
     end
 
@@ -251,6 +278,7 @@ module Isuda
       end
 
       db.xquery(%| DELETE FROM entry WHERE keyword = ? |, keyword) # うまいこと246と結合できないか
+      del_keyword(keyword)
 
       redirect_found '/'
     end
