@@ -7,7 +7,7 @@ require 'dotenv'
 Dotenv.load
 if ENV['STACKPROF'] == '1'
   require 'stackprof'
-  Dir.mkdir('/tmp/stackprof') unless File.exist?('/tmp/stackprof/isuda')
+  Dir.mkdir('/tmp/stackprof/isuda') unless File.exist?('/tmp/stackprof/isuda')
   use StackProf::Middleware, enabled: true,
       mode: :wall,
       interval: 10,

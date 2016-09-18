@@ -5,7 +5,7 @@ require_relative './lib/isutar/web.rb'
 Dotenv.load
 if ENV['STACKPROF'] == '1'
   require 'stackprof'
-  Dir.mkdir('/tmp/stackprof') unless File.exist?('/tmp/stackprof/isuda')
+  Dir.mkdir('/tmp/stackprof/isutar') unless File.exist?('/tmp/stackprof/isutar')
   use StackProf::Middleware, enabled: true,
       mode: :wall,
       interval: 10,
