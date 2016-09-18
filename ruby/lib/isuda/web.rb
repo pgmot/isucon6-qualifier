@@ -97,6 +97,14 @@ module Isuda
         redis.zrevrange('keywords', 0, -1)
       end
 
+      def aho_corasick
+        Thread.current[:db] ||= AhoCorasickMatcher.new(get_keywords())
+      end
+
+      def update_aho_corasick
+        Thread.current[:db] = AhoCorasickMatcher.new(get_keywords())
+      end
+
       def register(name, pw) # nameとpwを
         chars = [*'A'..'~']
         salt = 1.upto(20).map { chars.sample }.join('')
@@ -136,8 +144,7 @@ module Isuda
         #   escaped_content.gsub!(hash, anchor)
         # end
         # escaped_content.gsub(/\n/, "<br />\n")
-        @aho_corasick ||= AhoCorasickMatcher.new(get_keywords())
-        escaped_content = @aho_corasick.create_autolink(content)
+        escaped_content = aho_corasick.create_autolink(content)
         escaped_content.gsub(/\n/, "<br />\n")
       end
 
@@ -262,6 +269,7 @@ module Isuda
       |, *bound) # キーワード同一になってたら、description更新？
 
       add_keyword(keyword)
+      update_aho_corasick
 
       redirect_found '/'
     end
@@ -289,6 +297,7 @@ module Isuda
 
       db.xquery(%| DELETE FROM entry WHERE keyword = ? |, keyword) # うまいこと246と結合できないか
       del_keyword(keyword)
+      update_aho_corasick
 
       redirect_found '/'
     end
