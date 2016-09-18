@@ -48,7 +48,7 @@ module Isutar
       JSON.generate(result: 'ok')
     end
 
-    get '/stars' do
+    get '/stars' do # 
       keyword = params[:keyword] || ''
       stars = db.xquery(%| select * from star where keyword = ? |, keyword).to_a
 
@@ -68,7 +68,7 @@ module Isutar
       db.xquery(%|
         INSERT INTO star (keyword, user_name, created_at)
         VALUES (?, ?, NOW())
-      |, keyword, user_name)
+      |, keyword, user_name) # 
 
       content_type :json
       JSON.generate(result: 'ok')

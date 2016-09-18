@@ -91,9 +91,9 @@ module Isuda
 
       def htmlify(content)
         keywords = db.xquery(%| select * from entry order by character_length(keyword) desc |)
-        pattern = keywords.map {|k| Regexp.escape(k[:keyword]) }.join('|') # あー重そう。Regexpをエスケープした上で正規表現にする。
+        pattern = keywords.map {|k| Regexp.escape(k[:keyword]) }.join('|') # あー重そう。Regexpをエスケープする。
         kw2hash = {} # kw2hash
-        hashed_content = content.gsub(/(#{pattern})/) {|m| # キーワードをハッシュに置換する
+        hashed_content = content.gsub(/(#{pattern})/) {|m| # 正規表現作ってる、キーワードをハッシュに置換する
           matched_keyword = $1
           "isuda_#{Digest::SHA1.hexdigest(matched_keyword)}".tap do |hash|
             kw2hash[matched_keyword] = hash
@@ -102,7 +102,7 @@ module Isuda
         escaped_content = Rack::Utils.escape_html(hashed_content) # 
         kw2hash.each do |(keyword, hash)| # ハッシュをアンカーに置換する
           keyword_url = url("/keyword/#{Rack::Utils.escape_path(keyword)}")
-          anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおくのアリ
+          anchor = '<a href="%s">%s</a>' % [keyword_url, Rack::Utils.escape_html(keyword)] # 作ってどっかに予め放り込んでおきたいけど無理、7000件を毎回やるの無理
           escaped_content.gsub!(hash, anchor)
         end
         escaped_content.gsub(/\n/, "<br />\n")
@@ -195,7 +195,7 @@ module Isuda
 
     post '/login' do # TODO タイムアウト
       name = params[:name]
-      user = db.xquery(%| select * from user where name = ? |, name).first
+      user = db.xquery(%| select * from user where name = ? |, name).first # TODO とりあえずname で index貼りたい
       halt(403) unless user
       halt(403) unless user[:password] == encode_with_salt(password: params[:password], salt: user[:salt])
 
@@ -213,7 +213,7 @@ module Isuda
       keyword = params[:keyword] || ''
       halt(400) if keyword == '' # はてなキーワード
       description = params[:description]
-      halt(400) if is_spam_content(description) || is_spam_content(keyword) # ここ重そう
+      halt(400) if is_spam_content(description) || is_spam_content(keyword) # ここ重そう TODO ここCONCATしてしまいたい
 
       bound = [@user_id, keyword, description] * 2
       db.xquery(%|
@@ -221,7 +221,7 @@ module Isuda
         VALUES (?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
         author_id = ?, keyword = ?, description = ?, updated_at = NOW()
-      |, *bound) # キーワード同一になってたら、description更新？
+      |, *bound) # キーワード同一になってたら、description更新？ Upsert処理はできてる http://web-academia.org/it_business_web_development/%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0/482/
 
       redirect_found '/'
     end
