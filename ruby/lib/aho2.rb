@@ -14,7 +14,7 @@ class AhoCorasickMatcher
   def match(string)
     matches = []
     string.each_char.reduce(root) do |node, char|
-      child = (node || root).search(char.intern)
+      child = (node || root).search(char.intern) # char.internで、シンボル化
       next unless child
 
       matches.push(*child.matches)
@@ -26,30 +26,37 @@ class AhoCorasickMatcher
 
   def create_autolink(string)
     pos = 0
-    prestart = -1
-    preend = -1
     ret = []
+    last_found_node = nil
 
     string.each_char.each_with_index.reduce(root) do |node, (char, cur)|
       child = (node || root).search(char.intern)
-      next unless child
-      if found = child.matches.max{|a, b| a.length <=> b.length }
-        start = cur - found.length + 1
-        next if start == prestart or start < preend
 
-        match = ret.last && ret.last.match(/>([^<]+)<\/a>/)
-        ret.pop if match && found.include?(match[1])
-
-        ret << Rack::Utils.escape_html(string[pos..start-1])
+      # childが親ノードに含まれていないとき(= トライ木をたどるのが途絶えたとき)の
+      # last_found_node(最新のマッチ情報が含まれる)が最長マッチになるので、
+      # それまでの文字列と最長マッチをretに突っ込む。
+      if last_found_node && !node.child_map.values.include?(child)
+        found = last_found_node.matches.max{|a, b| a.length <=> b.length }
+        start = cur - found.length - 1
+        ret << Rack::Utils.escape_html(string[pos..start]) if start >= 0
         ret << create_link(found)
-        pos = cur + 1
-        prestart = start
-        preend = pos
+        last_found_node = nil
+        pos = cur
       end
-      child
+
+      next unless child
+
+      # マッチが見つかったら、そのノードを突っ込む
+      last_found_node = child if child.matches.length > 0
+      next child
     end
-    
-    if pos < string.length - 1
+
+    # 一番最後の文字列がマッチしていた場合。上のやつをdo-whileっぽく書けばここは要らないかも。
+    if last_found_node
+      found = last_found_node.matches.max{|a, b| a.length <=> b.length }
+      start = string.length - found.length - 1
+      ret << create_link(found)
+    elsif pos < string.length
       ret << string[pos..-1]
     end
 
@@ -57,8 +64,27 @@ class AhoCorasickMatcher
   end
 
   private
+  def uri(addr = nil, absolute = true, add_script_name = true)
+    request = Sinatra::Request.new({"rack.url_scheme" => "http", "SERVER_PORT" => "80", "REQUEST_METHOD" => "GET", "SERVER_NAME" => "13.78.127.3"})
+
+    return addr if addr =~ /\A[A-z][A-z0-9\+\.\-]*:/
+    uri = [host = ""]
+    if absolute
+      host << "http#{'s' if request.secure?}://"
+      if request.forwarded? or request.port != (request.secure? ? 443 : 80)
+        host << request.host_with_port
+      else
+        host << request.host
+      end
+    end
+    uri << request.script_name.to_s if add_script_name
+    uri << (addr ? addr : request.path_info).to_s
+    File.join uri
+  end
+
   def create_link(keyword)
-    anchor = '<a href="%s">%s</a>' % ["/keyword/#{Rack::Utils.escape_path(keyword)}", Rack::Utils.escape_html(keyword)]
+    anchor = '<a href="%s">%s</a>' % [uri("/keyword/#{Rack::Utils.escape_path(keyword)}"), Rack::Utils.escape_html(keyword)]
+    # anchor = '<a href="%s">%s</a>' % ["/keyword/#{Rack::Utils.escape_path(keyword)}", Rack::Utils.escape_html(keyword)]
   end
 
   def build_trie(dictionary)
