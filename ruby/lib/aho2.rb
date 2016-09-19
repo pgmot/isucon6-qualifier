@@ -35,7 +35,7 @@ class AhoCorasickMatcher
       # childが親ノードに含まれていないとき(= トライ木をたどるのが途絶えたとき)の
       # last_found_node(最新のマッチ情報が含まれる)が最長マッチになるので、
       # それまでの文字列と最長マッチをretに突っ込む。
-      if last_found_node && !node.child_map.values.include?(child)
+      if last_found_node && (!child || child.parent != node)
         found = last_found_node.matches.max{|a, b| a.length <=> b.length }
         start = cur - found.length - 1
         ret << Rack::Utils.escape_html(string[pos..start]) if start >= 0
@@ -143,7 +143,7 @@ class AhoCorasickMatcher
 
         if child_suffix
           child.suffix = child_suffix
-          child.matches.push(*child_suffix.matches)
+          child.matches.push(*child_suffix.matches) # 末尾一致のマッチリストに追加する
         elsif failure.root?
           child.suffix = failure
         end
