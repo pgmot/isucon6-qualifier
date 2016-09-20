@@ -12,6 +12,7 @@ require 'tilt/erubis'
 
 require 'redis'
 require_relative './../aho2.rb'
+require 'digest/md5'
 
 module Isuda
   class Web < ::Sinatra::Base
@@ -99,20 +100,20 @@ module Isuda
       end
 
       def update_aho
-        puts 'update aho'
         Thread.current[:aho] = AhoCorasickMatcher.new(get_keywords())
         marshal_aho = Marshal.dump(Thread.current[:aho])
-        Thread.current[:marshal_aho] = marshal_aho
+        hash_aho = Digest::MD5.hexdigest(marshal_aho)
+
+        Thread.current[:hash_aho] = hash_aho
         redis.set('marshal_aho', marshal_aho)
+        redis.set('hash_aho', hash_aho)
       end
 
       def aho_corasick
-        marshal_aho = redis.get('marshal_aho')
-        if Thread.current[:marshal_aho] != marshal_aho
-          puts marshal_aho.length
-          puts (Thread.current[:marshal_aho] || '').length
-          Thread.current[:marshal_aho] = marshal_aho
-          Thread.current[:aho] = Marshal.load(marshal_aho)
+        hash_aho = redis.get('hash_aho')
+        if Thread.current[:hash_aho] != hash_aho
+          Thread.current[:hash_aho] = hash_aho
+          Thread.current[:aho] = Marshal.load(redis.get('marshal_aho'))
         end
         Thread.current[:aho]
       end
