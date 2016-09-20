@@ -72,42 +72,49 @@ module Isuda
       def redis(use_init = true)
         unless Thread.current[:redis]
           Thread.current[:redis] = Redis.new(:host => "127.0.0.1", :db => 0)
-          init_keywords if use_init
+          init_keywords if use_init && get_keywords.size == 0
         end
         Thread.current[:redis]
       end
 
       def init_keywords
         redis(false).zremrangebyrank('keywords', 0, -1)
-        incr.set('update', 0) unless incr.get('update')
-        Thread.current[:aho_update] ||= incr.get('update')
         keywords = db.xquery(%| select keyword from entry |)
         keywords.each do |k|
           add_keyword(k[:keyword])
         end
+        update_aho
       end
 
       def add_keyword(keyword)
         redis.zadd 'keywords', keyword.length, keyword
-        redis.incr('update')
       end
 
       def del_keyword(keyword)
         redis.zrem 'keywords', keyword
-        redis.incr('update')
       end
 
       def get_keywords
         redis.zrevrange('keywords', 0, -1)
       end
 
+      def update_aho
+        puts 'update aho'
+        Thread.current[:aho] = AhoCorasickMatcher.new(get_keywords())
+        marshal_aho = Marshal.dump(Thread.current[:aho])
+        Thread.current[:marshal_aho] = marshal_aho
+        redis.set('marshal_aho', marshal_aho)
+      end
+
       def aho_corasick
-        update = redis.get('update')
-        if update > Thread.current[:aho_update]
-          Thread.current[:aho] = nil
-          Thread.current[:aho_update] = update
+        marshal_aho = redis.get('marshal_aho')
+        if Thread.current[:marshal_aho] != marshal_aho
+          puts marshal_aho.length
+          puts (Thread.current[:marshal_aho] || '').length
+          Thread.current[:marshal_aho] = marshal_aho
+          Thread.current[:aho] = Marshal.load(marshal_aho)
         end
-        Thread.current[:aho] ||= AhoCorasickMatcher.new(get_keywords())
+        Thread.current[:aho]
       end
 
       def register(name, pw) # nameとpwを
@@ -274,6 +281,7 @@ module Isuda
       |, *bound) # キーワード同一になってたら、description更新？
 
       add_keyword(keyword)
+      update_aho
 
       redirect_found '/'
     end
@@ -301,6 +309,7 @@ module Isuda
 
       db.xquery(%| DELETE FROM entry WHERE keyword = ? |, keyword) # うまいこと246と結合できないか
       del_keyword(keyword)
+      update_aho
 
       redirect_found '/'
     end

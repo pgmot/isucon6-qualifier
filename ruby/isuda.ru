@@ -10,7 +10,7 @@ if ENV['STACKPROF'] == '1'
   Dir.mkdir('/tmp/stackprof/isuda') unless File.exist?('/tmp/stackprof/isuda')
   use StackProf::Middleware, enabled: true,
       mode: :wall,
-      interval: 10,
+      interval: 100,
       save_every: 1,
       path: '/tmp/stackprof/isuda'
 end
