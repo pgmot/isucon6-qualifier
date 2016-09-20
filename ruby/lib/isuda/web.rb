@@ -335,5 +335,11 @@ module Isuda
       content_type :json
       JSON.generate(result: 'ok')
     end
+
+    if ENV['SQLLOG'] == '1'
+      after do
+        db.general_log.save(req: request, backtrace: true)
+      end
+    end
   end
 end
