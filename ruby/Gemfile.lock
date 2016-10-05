@@ -1,3 +1,11 @@
+GIT
+  remote: git://github.com/ABCanG/mysql2-client-general_log.git
+  revision: b56b2b2d65341e73049c02751ca44a6c6fdb1dd5
+  branch: writefile
+  specs:
+    mysql2-client-general_log (0.2.1)
+      mysql2
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -44,6 +52,7 @@ DEPENDENCIES
   erubis
   foreman
   mysql2
+  mysql2-client-general_log!
   mysql2-cs-bind
   redis
   sinatra
@@ -55,4 +64,4 @@ RUBY VERSION
    ruby 2.3.1p112
 
 BUNDLED WITH
-   1.13.0
+   1.13.2

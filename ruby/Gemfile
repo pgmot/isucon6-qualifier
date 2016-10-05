@@ -8,6 +8,7 @@ gem 'mysql2-cs-bind'
 gem 'sinatra'
 gem 'unicorn'
 gem 'redis'
+gem 'mysql2-client-general_log', github: 'ABCanG/mysql2-client-general_log', branch: 'writefile'
 
 group :development do
   gem 'foreman'

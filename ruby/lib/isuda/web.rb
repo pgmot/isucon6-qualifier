@@ -338,7 +338,7 @@ module Isuda
 
     if ENV['SQLLOG'] == '1'
       after do
-        db.general_log.save(req: request, backtrace: true)
+        db.general_log.writefile(req: request, backtrace: true)
       end
     end
   end
