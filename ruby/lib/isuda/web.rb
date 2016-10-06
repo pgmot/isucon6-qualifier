@@ -81,9 +81,7 @@ module Isuda
       def init_keywords
         redis(false).zremrangebyrank('keywords', 0, -1)
         keywords = db.xquery(%| select keyword from entry |)
-        keywords.each do |k|
-          add_keyword(k[:keyword])
-        end
+        redis.zadd 'keywords', keywords.map{ |k| [k[:keyword].length, k[:keyword]] }.flatten
         update_aho
       end
 
